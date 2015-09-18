@@ -272,6 +272,8 @@ protected:
    * fixedFrameChanged() is called. */
   QString fixed_frame_;
 
+  Config config_;
+
 public Q_SLOTS:
   virtual void onEnableChanged();
 

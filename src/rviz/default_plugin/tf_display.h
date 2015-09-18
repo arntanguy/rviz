@@ -69,6 +69,7 @@ public:
   virtual ~TFDisplay();
 
   virtual void update(float wall_dt, float ros_dt);
+  virtual void load( const Config& config );
 
 protected:
   // Overrides from Display

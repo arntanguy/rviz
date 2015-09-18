@@ -70,10 +70,10 @@ Property::Property( const QString& name,
   if( parent )
   {
     parent->addChild( this );
-  }
-  if( receiver == 0 )
-  {
-    receiver = parent;
+    if( receiver == 0 )
+    {
+      receiver = parent;
+    }
   }
   if( receiver && changed_slot )
   {
@@ -358,7 +358,9 @@ void Property::addChild( Property* child, int index )
 
   children_.insert( index, child );
   child_indexes_valid_ = false;
-  child->setModel( model_ );
+  if( model_ ) {
+    child->setModel( model_ );
+  }
   child->parent_ = this;
 
   if( model_ )

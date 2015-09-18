@@ -213,30 +213,61 @@ void TFDisplay::onInitialize()
   axes_node_ = root_node_->createChildSceneNode();
 }
 
+void TFDisplay::load(const Config& config) {
+  config_ = config;
+  Display::load(config);
+  std::cout << "TF display load" << std::endl;
+  Config c = config.mapGetChild("Frames");
+
+
+  for( Config::MapIterator iter = c.mapIterator(); iter.isValid(); iter.advance() )
+  {
+    QString key = iter.currentKey();
+    if(key != "All Enabled") {
+      Config child = iter.currentChild();
+      bool en = child.mapGetChild("Value").getValue().toBool();
+      std::cout << "key " << key.toStdString() << " has value " << en << std::endl;
+
+      FrameInfo * info = createFrame(key.toStdString());
+      info->enabled_property_->setBool(en);
+      frames_[key.toStdString()] = info;
+    }
+  }
+}
+
 void TFDisplay::clear()
 {
   // Clear the tree.
   tree_category_->removeChildren();
 
   // Clear the frames category, except for the "All enabled" property, which is first.
-  frames_category_->removeChildren( 1 );
+  // frames_category_->removeChildren( 1 );
 
-  S_FrameInfo to_delete;
+  // Only delete the tf that aren't stored in the configuration file
   M_FrameInfo::iterator frame_it = frames_.begin();
   M_FrameInfo::iterator frame_end = frames_.end();
-  for ( ; frame_it != frame_end; ++frame_it )
-  {
-    to_delete.insert( frame_it->second );
+  for ( ; frame_it != frame_end; ) {
+    bool toDelete = true;
+    for( Config::MapIterator iter = config_.mapGetChild("Frames").mapIterator(); iter.isValid(); iter.advance() )
+    {
+      std::string key = iter.currentKey().toStdString();
+      std::cout << "CLEAR KEY: " << key << std::endl;
+      if(frame_it->first == key) {
+        toDelete = false;
+        break;
+      }
+    }
+    if(toDelete) {
+      std::cout << "Deleting " << frame_it->first << std::endl;
+      if(frame_it->second) {
+        deleteFrame( frame_it->second, false );
+      }
+      std::cout << "Deleting frame element" << std::endl;
+      frames_.erase(frame_it++);
+    } else {
+      ++frame_it;
+    }
   }
-
-  S_FrameInfo::iterator delete_it = to_delete.begin();
-  S_FrameInfo::iterator delete_end = to_delete.end();
-  for ( ; delete_it != delete_end; ++delete_it )
-  {
-    deleteFrame( *delete_it, false );
-  }
-
-  frames_.clear();
 
   update_timer_ = 0.0f;
 
@@ -343,6 +374,7 @@ FrameInfo* TFDisplay::getFrameInfo( const std::string& frame )
 
 void TFDisplay::updateFrames()
 {
+  std::cout << "updateFrames" << std::endl;
   typedef std::vector<std::string> V_string;
   V_string frames;
   context_->getTFClient()->getFrameStrings( frames );
@@ -365,7 +397,9 @@ void TFDisplay::updateFrames()
       FrameInfo* info = getFrameInfo( frame );
       if (!info)
       {
+        std:: cout << "NO frame for frame " << frame << std::endl;
         info = createFrame(frame);
+        frames_[frame] = info;
       }
       else
       {
@@ -376,25 +410,25 @@ void TFDisplay::updateFrames()
     }
   }
 
-  {
-    S_FrameInfo to_delete;
-    M_FrameInfo::iterator frame_it = frames_.begin();
-    M_FrameInfo::iterator frame_end = frames_.end();
-    for ( ; frame_it != frame_end; ++frame_it )
-    {
-      if ( current_frames.find( frame_it->second ) == current_frames.end() )
-      {
-        to_delete.insert( frame_it->second );
-      }
-    }
+  // {
+  //   S_FrameInfo to_delete;
+  //   M_FrameInfo::iterator frame_it = frames_.begin();
+  //   M_FrameInfo::iterator frame_end = frames_.end();
+  //   for ( ; frame_it != frame_end; ++frame_it )
+  //   {
+  //     if ( current_frames.find( frame_it->second ) == current_frames.end() )
+  //     {
+  //       to_delete.insert( frame_it->second );
+  //     }
+  //   }
 
-    S_FrameInfo::iterator delete_it = to_delete.begin();
-    S_FrameInfo::iterator delete_end = to_delete.end();
-    for ( ; delete_it != delete_end; ++delete_it )
-    {
-      deleteFrame( *delete_it, true );
-    }
-  }
+  //   S_FrameInfo::iterator delete_it = to_delete.begin();
+  //   S_FrameInfo::iterator delete_end = to_delete.end();
+  //   for ( ; delete_it != delete_end; ++delete_it )
+  //   {
+  //     deleteFrame( *delete_it, true );
+  //   }
+  // }
 
   context_->queueRender();
 }
@@ -404,6 +438,7 @@ static const Ogre::ColourValue ARROW_SHAFT_COLOR(0.8f, 0.8f, 0.3f, 1.0f);
 
 FrameInfo* TFDisplay::createFrame(const std::string& frame)
 {
+  std::cout << "Create Frame" << std::endl;
   FrameInfo* info = new FrameInfo( this );
   frames_.insert( std::make_pair( frame, info ) );
 
@@ -464,6 +499,7 @@ Ogre::ColourValue lerpColor(const Ogre::ColourValue& start, const Ogre::ColourVa
 
 void TFDisplay::updateFrame( FrameInfo* frame )
 {
+  std::cout << "Update Frame " << frame->name_ << std::endl;
   tf::TransformListener* tf = context_->getTFClient();
 
   // Check last received time so we can grey out/fade out frames that have stopped being published
@@ -559,7 +595,8 @@ void TFDisplay::updateFrame( FrameInfo* frame )
   std::string old_parent = frame->parent_;
   frame->parent_.clear();
   bool has_parent = tf->getParent( frame->name_, ros::Time(), frame->parent_ );
-  if( has_parent )
+  std::cout << "parent: " << frame->parent_ << std::endl;
+  if( !frame->parent_.empty() || has_parent )
   {
     // If this frame has no tree property or the parent has changed,
     if( !frame->tree_property_ || old_parent != frame->parent_ )
@@ -568,6 +605,7 @@ void TFDisplay::updateFrame( FrameInfo* frame )
       M_FrameInfo::iterator parent_it = frames_.find( frame->parent_ );
       if( parent_it != frames_.end() )
       {
+        std::cout << "Update parent for " << frame->name_ << " with " << frame->parent_ << std::endl;
         FrameInfo* parent = parent_it->second;
 
         // Delete the old tree property.
@@ -575,9 +613,10 @@ void TFDisplay::updateFrame( FrameInfo* frame )
         frame->tree_property_ = NULL;
 
         // If the parent has a tree property, make a new tree property for this frame.
-        if( parent->tree_property_ )
-        {
-          frame->tree_property_ = new Property( QString::fromStdString( frame->name_ ), QVariant(), "", parent->tree_property_ );
+        if(parent && parent->tree_property_) {
+            // XXX segfaults
+            frame->tree_property_ = new Property( QString::fromStdString( frame->name_ ), QVariant(), "", parent->tree_property_ );
+            // frame->tree_property_ = new Property( QString::fromStdString( frame->name_ ), QVariant(), "", tree_category_ );
         }
       }
     }
@@ -641,8 +680,9 @@ void TFDisplay::updateFrame( FrameInfo* frame )
   {
     if ( !frame->tree_property_ || old_parent != frame->parent_ )
     {
-      delete frame->tree_property_;
-      frame->tree_property_ = new Property( QString::fromStdString( frame->name_ ), QVariant(), "", tree_category_ );
+        delete frame->tree_property_;
+        frame->tree_property_ = NULL;
+        frame->tree_property_ = new Property( QString::fromStdString( frame->name_ ), QVariant(), "", tree_category_ );
     }
 
     frame->parent_arrow_->getSceneNode()->setVisible( false );
@@ -657,8 +697,6 @@ void TFDisplay::deleteFrame( FrameInfo* frame, bool delete_properties )
   M_FrameInfo::iterator it = frames_.find( frame->name_ );
   ROS_ASSERT( it != frames_.end() );
 
-  frames_.erase( it );
-
   delete frame->axes_;
   context_->getSelectionManager()->removeObject( frame->axes_coll_ );
   delete frame->parent_arrow_;
@@ -667,7 +705,9 @@ void TFDisplay::deleteFrame( FrameInfo* frame, bool delete_properties )
   if( delete_properties )
   {
     delete frame->enabled_property_;
+    frame->enabled_property_ = NULL;
     delete frame->tree_property_;
+    frame->tree_property_ = NULL;
   }
   delete frame;
 }
@@ -699,6 +739,7 @@ FrameInfo::FrameInfo( TFDisplay* display )
 
 void FrameInfo::updateVisibilityFromFrame()
 {
+  std::cout << "updateVisibilityFromFrome" << std::endl;
   bool enabled = enabled_property_->getBool();
   selection_handler_->setEnabled( enabled );
   setEnabled( enabled );
