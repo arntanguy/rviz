@@ -213,6 +213,30 @@ void TFDisplay::onInitialize()
   axes_node_ = root_node_->createChildSceneNode();
 }
 
+void TFDisplay::load(const Config& config) {
+  // TODO parse config Tree
+  // FIXME deleteFrames deletes the tfs that are not published upon loading,
+  //       thus their state is never loaded correctly
+
+  Display::load(config);
+  std::cout << "TF display load" << std::endl;
+
+  Config c = config.mapGetChild("Frames");
+  for( Config::MapIterator iter = c.mapIterator(); iter.isValid(); iter.advance() )
+  {
+    QString key = iter.currentKey();
+    if(key != "All Enabled") {
+      Config child = iter.currentChild();
+      bool en = child.mapGetChild("Value").getValue().toBool();
+      std::cout << "key " << key.toStdString() << " has value " << en << std::endl;
+
+      FrameInfo * info = createFrame(key.toStdString());
+      info->enabled_property_->setBool(en);
+    }
+  }
+  
+}
+
 void TFDisplay::clear()
 {
   // Clear the tree.
@@ -404,6 +428,7 @@ static const Ogre::ColourValue ARROW_SHAFT_COLOR(0.8f, 0.8f, 0.3f, 1.0f);
 
 FrameInfo* TFDisplay::createFrame(const std::string& frame)
 {
+  std::cout << "Create frame: " << frame << std::endl;
   FrameInfo* info = new FrameInfo( this );
   frames_.insert( std::make_pair( frame, info ) );
 
