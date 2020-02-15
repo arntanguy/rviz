@@ -4,8 +4,7 @@ name: Package rviz 1.9.0
 #
 # It will:
 # - Build packages for selected Debian/Ubuntu distro
-# - Upload the packages to https://dl.bintray.com/gergondet/multi-contact-head
-# - Upload the packages to https://dl.bintray.com/gergondet/multi-contact
+# - Upload the packages to https://dl.bintray.com/arntanguy/rviz
 #
 
 on:
@@ -19,21 +18,47 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        dist: [xenial, bionic, focal]
+        dist: [xenial, bionic]
         arch: [i386, amd64]
-        exclude:
-          - dist: focal
-            arch: i386
     runs-on: ubuntu-18.04
     steps:
     - uses: actions/checkout@v1
       with:
         submodules: recursive
+    - name: Setup environment
+      run: |
+        echo "::set-env name=EXTRA_MIRROR::https://dl.bintray.com/arntanguy/rviz"
+        export PACKAGES_OUT=/tmp/packages-${{ matrix.dist }}-${{ matrix.arch }}
+        export ROS_DISTRO=""
+        if [ "${{ matrix.dist }}" = "xenial" ]
+        then
+          export ROS_DISTRO="kinetic"
+          export PACKAGES_OUT=${PACKAGES_OUT}-${ROS_DISTRO}
+        fi
+        if [ "${{ matrix.dist }}" = "bionic" -a "${{ matrix.arch }}" = "amd64" ]
+        then
+          export ROS_DISTRO="melodic"
+          export PACKAGES_OUT=${PACKAGES_OUT}-${ROS_DISTRO}
+        fi
+        echo "::set-env name=ROS_DISTRO::${ROS_DISTRO}"
+        echo "::set-env name=PACKAGES_OUT::${PACKAGES_OUT}"
+        if [ "${ROS_DISTRO}" != "" ]
+        then
+          sed -e"s/@ROS_DISTRO@/${ROS_DISTRO}/" debian/control.ros | tee -a debian/control
+          sed -i -e"s/# ros-@ROS_DISTRO@/ ros-${ROS_DISTRO}/" debian/control
+          cat debian/control
+          sed -i -e"s/@ROS_DISTRO@/${ROS_DISTRO}/" debian/rules
+          sed -i -e"s/#export/export/" debian/rules
+          cat debian/rules
+        fi
     - name: Build package
       uses: jrl-umi3218/github-actions/build-package-native@master
       with:
         dist: ${{ matrix.dist }}
         arch: ${{ matrix.arch }}
+        ros-distro: ${{env.ROS_DISTRO}}
+        other-mirrors: ${{ env.EXTRA_MIRROR }}
+        other-gpg-keys: "A650E12EFF6D3EDE"
     - uses: actions/upload-artifact@v1
       with:
         name: packages-${{ matrix.dist }}-${{ matrix.arch }}
