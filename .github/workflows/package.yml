@@ -5,7 +5,6 @@ name: Package rviz 1.9.0
 # It will:
 # - Build packages for selected Debian/Ubuntu distro
 # - Upload the packages to https://dl.bintray.com/arntanguy/rviz
-#
 
 on:
   push:
@@ -18,8 +17,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        dist: [xenial, bionic]
-        arch: [i386, amd64]
+        dist: [xenial,bionic]
+        arch: [amd64]
     runs-on: ubuntu-18.04
     steps:
     - uses: actions/checkout@v1
@@ -47,7 +46,7 @@ jobs:
           sed -e"s/@ROS_DISTRO@/${ROS_DISTRO}/" debian/control.ros | tee -a debian/control
           sed -i -e"s/# ros-@ROS_DISTRO@/ ros-${ROS_DISTRO}/" debian/control
           cat debian/control
-          sed -i -e"s/@ROS_DISTRO@/${ROS_DISTRO}/" debian/rules
+          sed -i -e"s/@ROS_DISTRO@/${ROS_DISTRO}/" debian/rules.ros | tee -a debian/rules
           sed -i -e"s/#export/export/" debian/rules
           cat debian/rules
         fi
@@ -89,8 +88,8 @@ jobs:
         subject: arntanguy
         repo: rviz
         package: |
-          name: rviz-1.9
-          desc: "Custom build of rviz (1.9.0)"
+          name: ros-melodic-rviz
+          desc: "Custom build of rviz (1.9.0), built against Ogre 1.9.1"
           licenses: [MIT]
           vcs_url: https://github.com/ros-visualization/rviz
         version: 1.9.0
