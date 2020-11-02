@@ -44,13 +44,13 @@ else()
   set(ASSIMP_INCLUDE_DIRS)
 endif()
 
-pkg_check_modules(OGRE_OV OGRE OGRE-Overlay)
+pkg_check_modules(OGRE_OV OGRE=1.9.1 OGRE-Overlay=1.9.1)
 
 # Old versions of OGRE (pre 1.9) included OGRE-Overlay in the main package
 # (i.e. there was no OGRE-Overlay component).  So if the above
 # pkg_check_modules() failed, try looking for just OGRE.
 if(NOT OGRE_OV_FOUND)
-  pkg_check_modules(OGRE_OV REQUIRED OGRE)
+  pkg_check_modules(OGRE_OV REQUIRED OGRE=1.9.1)
 endif(NOT OGRE_OV_FOUND)
 
 ## Find OGRE Plugin path (not necessarily platform-independent, I guess)
